@@ -781,7 +781,21 @@ class Horde_Mail_Rfc822
                     continue 2;
 
                 case '(':
-                    $this->_rfc822SkipComment();
+                    /* If '(' does not open a valid comment (no matching
+                     * ')'), it is not a comment — treat it as a regular
+                     * character. Rewind to the '(' so the caller can
+                     * decide what to do (typically: stop, since '(' is
+                     * not valid in atext / mime-token context). This
+                     * keeps malformed-but-recoverable inputs alive,
+                     * notably content-parameter values like
+                     * `filename=(foo no icon.png` (Mime/ContentParam). */
+                    $savedPtr = $this->_ptr;
+                    try {
+                        $this->_rfc822SkipComment();
+                    } catch (Horde_Mail_Exception $e) {
+                        $this->_ptr = $savedPtr;
+                        return;
+                    }
                     break;
 
                 default:

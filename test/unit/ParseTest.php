@@ -66,6 +66,33 @@ class ParseTest extends TestCase
     }
 
     /**
+     * Lenient handling of an unclosed CFWS comment.
+     *
+     * RFC 5322 §3.2.2: a '(' starts a CFWS comment that must be closed
+     * by ')'. When the closing ')' is missing (malformed input), the
+     * parser used to throw Horde_Mail_Exception('Error when parsing a
+     * comment.'), aborting the whole parse. A '(' that does not open a
+     * valid comment should be treated as a regular character so the
+     * surrounding address can still be extracted.
+     *
+     * The same root cause affects content-parameter parsing in
+     * Horde_Mime_ContentParam_Decode (which inherits SkipLwsp from
+     * this class), e.g. `Content-Disposition: inline; filename=(foo`.
+     */
+    public function testUnclosedCommentDoesNotThrow()
+    {
+        $result = $this->rfc822->parseAddressList('foo@bar.com (incomplete');
+
+        // Main assertion: the address before the bogus '(' must be
+        // recovered intact (mailbox AND host). Pre-fix the parser
+        // returned host=null, having consumed the failed comment and
+        // lost the address state.
+        $this->assertGreaterThanOrEqual(1, count($result));
+        $this->assertEquals('foo', $result[0]->mailbox);
+        $this->assertEquals('bar.com', $result[0]->host);
+    }
+
+    /**
      * Test case for PEAR Mail:: bug #9137
      */
     #[DataProvider('parseBug9137Provider')]
